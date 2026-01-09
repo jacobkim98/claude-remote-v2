@@ -1,0 +1,5 @@
+websockets>=12.0
+aiohttp>=3.9.0
+pyautogui>=0.9.54
+pywin32>=306
+pyperclip>=1.8.2
