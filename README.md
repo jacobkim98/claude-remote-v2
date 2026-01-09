@@ -7,6 +7,8 @@
 1. **명령 전송**: 핸드폰에서 Claude에게 직접 명령
 2. **작업 결과 보기**: Claude가 수행한 작업 내역 실시간 확인
 3. **권한 요청 응답**: Allow / Deny / Always
+4. **Claude 응답 보기**: Claude의 텍스트 응답을 실시간으로 확인
+5. **대화 히스토리**: 사용자 메시지와 Claude 응답을 대화 형태로 표시
 
 ## 구조
 
@@ -19,7 +21,8 @@ claude-remote-v2/
 │
 ├── hooks/                  # Claude Code Hooks
 │   ├── hook_permission.py  # 권한 요청 Hook
-│   └── hook_post_tool.py   # 작업 결과 Hook
+│   ├── hook_post_tool.py   # 작업 결과 Hook
+│   └── hook_stop.py        # Claude 응답 Hook (Stop Hook)
 │
 ├── app/claude_remote/      # Flutter 앱
 │   └── lib/main.dart
@@ -69,11 +72,13 @@ claude
 
 ### 명령 전송
 1. 앱 하단 입력창에 명령 입력
-2. 전송 버튼 클릭
+2. 전송 버튼 클릭 (Enter 키는 비활성화됨 - 한글 입력 오류 방지)
 3. PC의 Claude 창에 자동으로 입력됨
 
-### 작업 결과 보기
-- Claude가 도구를 실행할 때마다 앱에 실시간으로 표시됨
+### 대화 히스토리
+- **연보라색 카드**: 사용자가 보낸 메시지
+- **회색 카드**: Claude 응답 (탭하면 전체 내용 보기)
+- **일반 카드**: 도구 실행 결과, 권한 요청 기록
 
 ### 권한 요청 응답
 - 알림으로 권한 요청이 오면 Allow/Deny/Always 선택
@@ -131,7 +136,7 @@ claude
 ### 포트 정보
 | 포트 | 프로토콜 | 용도 |
 |------|----------|------|
-| 8765 | HTTP | Hook → Server (권한 요청, 작업 결과) |
+| 8765 | HTTP | Hook → Server (권한 요청, 작업 결과, Claude 응답) |
 | 8766 | WebSocket | App ↔ Server (실시간 양방향 통신) |
 
 ### HTTP 엔드포인트
@@ -140,6 +145,7 @@ claude
 | `POST /` | 권한 요청 수신 |
 | `POST /tool-result` | 작업 결과 수신 |
 | `POST /response` | 앱 HTTP 응답 (백그라운드) |
+| `POST /claude-response` | Claude 응답 수신 (Stop Hook) |
 
 ### WebSocket 메시지 타입
 | 타입 | 방향 | 설명 |
@@ -149,6 +155,7 @@ claude
 | `permission_request` | Server→App | 권한 요청 알림 |
 | `permission_response` | App→Server | 권한 응답 |
 | `tool_result` | Server→App | 작업 결과 알림 |
+| `claude_response` | Server→App | Claude 텍스트 응답 |
 | `hwnd_update` | Server→App | 현재 연결된 창 정보 |
 | `window_select` | Server→App | 창 선택 요청 (여러 개일 때) |
 | `select_window` | App→Server | 창 선택 응답 |
@@ -171,16 +178,17 @@ claude
 - **server.py**: 에러 메시지를 앱으로 전송
 - **main.dart**: 에러 메시지 상태바 표시 (빨간색)
 
+### v1.2 - Claude 응답 표시 기능 추가
+- **hook_stop.py**: Stop Hook 추가 - transcript에서 Claude 응답 추출
+- **server.py**: `/claude-response` 엔드포인트 추가
+- **main.dart**:
+  - Claude 응답 카드 추가 (회색 배경, 탭하면 전체 보기)
+  - 사용자 메시지 카드 추가 (연보라색 배경)
+  - 대화 히스토리 형태로 표시
+  - Enter 키 전송 비활성화 (한글 입력 오류 방지)
+- **settings.local.json**: Stop Hook 설정 추가
+- 디버그 코드 정리 및 불필요한 파일 삭제
+
 ### 시도했으나 제외된 기능
 - **Notification Hook**: Claude 응답을 앱에 전송하려 했으나, Notification Hook은 시스템 메시지만 제공하고 Claude의 실제 텍스트 응답은 포함하지 않아서 제외됨
-
-## Git 정보
-
-```bash
-# 저장소 위치
-c:/Users/akqls/Downloads/popup claude/claude-remote-v2/
-
-# 초기 커밋
-git log --oneline
-e01dceb Initial commit: Claude Remote Control v1.0
-```
+- **Stop Hook의 transcript_path**: 최종적으로 Stop Hook + transcript_path를 사용하여 Claude 응답 추출 성공

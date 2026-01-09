@@ -22,6 +22,17 @@
           }
         ]
       }
+    ],
+    "Stop": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"c:/Users/akqls/Downloads/popup claude/claude-remote-v2/hooks/hook_stop.py\""
+          }
+        ]
+      }
     ]
   }
 }

@@ -183,6 +183,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   String _windowTitle = "";
   Map<String, dynamic>? _currentRequest;
   final List<Map<String, dynamic>> _history = [];
+  String? _lastClaudeResponse;
 
   Timer? _reconnectTimer;
   Timer? _pingTimer;
@@ -272,8 +273,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
       _channel!.stream.listen(
         (message) async {
-          final data = jsonDecode(message);
-          final type = data['type'];
+          // 첫 메시지 수신 시 연결 완료로 표시
+          if (!_isConnected) {
+            setState(() => _isConnected = true);
+          }
+
+          try {
+            final data = jsonDecode(message);
+            final type = data['type'];
 
           if (type == 'permission_request') {
             currentRequestId = data['request_id'];
@@ -331,15 +338,29 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
           } else if (type == 'pong') {
             // keep-alive response
+
+          } else if (type == 'claude_response') {
+            // Claude 응답 수신
+            final response = data['response'] ?? '';
+            _showStatusMessage('Claude: ${response.length} chars', true);
+            setState(() {
+              _lastClaudeResponse = response;
+              // 히스토리에도 추가
+              _history.insert(0, {
+                'type': 'claude_response',
+                'response': response,
+                'timestamp': DateTime.now().toString().split('.')[0],
+              });
+              if (_history.length > 100) _history.removeLast();
+            });
+          }
+          } catch (e) {
+            // ignore parse errors
           }
         },
         onError: (_) => _handleDisconnect(),
         onDone: () => _handleDisconnect(),
       );
-
-      setState(() {
-        _isConnected = true;
-      });
     } catch (e) {
       _handleDisconnect();
     }
@@ -391,6 +412,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       'hwnd': _currentHwnd,
       'message': message,
     }));
+
+    // 히스토리에 내가 보낸 메시지 추가
+    setState(() {
+      _history.insert(0, {
+        'type': 'user_message',
+        'message': message,
+        'timestamp': DateTime.now().toString().split('.')[0],
+      });
+      if (_history.length > 100) _history.removeLast();
+    });
 
     _messageController.clear();
   }
@@ -709,9 +740,86 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     itemCount: _history.length,
                     itemBuilder: (_, i) {
                       final item = _history[i];
-                      final isPermission = item['type'] == 'permission';
+                      final itemType = item['type'];
+                      final isPermission = itemType == 'permission';
+                      final isClaudeResponse = itemType == 'claude_response';
                       final toolName = item['tool_name'] ?? '';
                       final decision = item['decision'];
+
+                      // 사용자 메시지 카드 (연한 분보라색 + 흰색 글자)
+                      if (itemType == 'user_message') {
+                        return Card(
+                          color: Colors.purple.shade200,
+                          child: Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.person, color: Colors.white, size: 20),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    item['message'] ?? '',
+                                    style: const TextStyle(color: Colors.white, fontSize: 14),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                if (item['timestamp'] != null)
+                                  Text(
+                                    item['timestamp'].toString().split(' ').last.substring(0, 5),
+                                    style: const TextStyle(fontSize: 12, color: Colors.white70),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }
+
+                      // Claude 응답 카드 (연한 회색 + 진한 회색 글자)
+                      if (isClaudeResponse) {
+                        return Card(
+                          color: Colors.grey.shade200,
+                          child: InkWell(
+                            onTap: () => _showResponseDialog(item['response'] ?? ''),
+                            child: Padding(
+                              padding: const EdgeInsets.all(12),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Icon(Icons.smart_toy, color: Colors.grey.shade700, size: 20),
+                                      const SizedBox(width: 8),
+                                      Text('Claude Response',
+                                          style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.grey.shade800)),
+                                      const Spacer(),
+                                      if (item['timestamp'] != null)
+                                        Text(
+                                          item['timestamp'].toString().split(' ').last.substring(0, 5),
+                                          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                                        ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    item['response'] ?? '',
+                                    maxLines: 4,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(fontSize: 13, color: Colors.grey.shade800),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Tap to see full response',
+                                    style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        );
+                      }
 
                       return Card(
                         child: ListTile(
@@ -769,7 +877,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       isDense: true,
                     ),
                     enabled: _isConnected && _currentHwnd != null,
-                    onSubmitted: (_) => _sendCommand(),
+                    // onSubmitted 제거 - 한글 입력 중 의도치 않은 전송 방지
+                    // 전송은 버튼으로만 가능
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -801,5 +910,35 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _statusTimer = Timer(const Duration(seconds: 2), () {
       setState(() => _statusMessage = null);
     });
+  }
+
+  void _showResponseDialog(String response) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.smart_toy, color: Colors.blue.shade700),
+            const SizedBox(width: 8),
+            const Text('Claude Response'),
+          ],
+        ),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: SingleChildScrollView(
+            child: SelectableText(
+              response,
+              style: const TextStyle(fontSize: 14),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
   }
 }

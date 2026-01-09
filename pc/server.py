@@ -60,7 +60,7 @@ async def broadcast_to_app(message):
         try:
             await connected_app.send(json.dumps(message))
             return True
-        except:
+        except Exception:
             return False
     return False
 
@@ -231,7 +231,10 @@ async def handle_app_connection(websocket):
     except websockets.exceptions.ConnectionClosed:
         print("[서버] 앱 연결 끊김")
     finally:
-        connected_app = None
+        # 현재 websocket이 connected_app과 같을 때만 초기화
+        if connected_app == websocket:
+            connected_app = None
+            print("[서버] connected_app 초기화됨")
 
 
 async def handle_permission_request(request):
@@ -342,12 +345,32 @@ async def handle_app_http_response(request):
     return web.json_response({"status": "not_found"}, status=404)
 
 
+async def handle_claude_response(request):
+    """Stop Hook에서 Claude 응답 수신"""
+    data = await request.json()
+    response_text = data.get("response", "")
+    session_id = data.get("session_id", "")
+
+    if response_text:
+        print(f"[서버] Claude 응답 수신: {len(response_text)} chars")
+
+        # 앱에 전송
+        await broadcast_to_app({
+            "type": "claude_response",
+            "session_id": session_id,
+            "response": response_text
+        })
+
+    return web.json_response({"status": "ok"})
+
+
 async def main():
     # HTTP 서버 설정
     app = web.Application()
     app.router.add_post('/', handle_permission_request)  # 권한 요청
     app.router.add_post('/tool-result', handle_tool_result)  # 작업 결과
     app.router.add_post('/response', handle_app_http_response)  # 앱 HTTP 응답
+    app.router.add_post('/claude-response', handle_claude_response)  # Claude 응답
 
     runner = web.AppRunner(app)
     await runner.setup()
