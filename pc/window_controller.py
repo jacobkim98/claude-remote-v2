@@ -33,7 +33,7 @@ def is_window_valid(hwnd):
 
 
 def activate_window(hwnd):
-    """HWND로 창 활성화"""
+    """HWND로 창 활성화. 실패시 에러 메시지 반환"""
     try:
         # 창이 최소화되어 있으면 복원
         if win32gui.IsIconic(hwnd):
@@ -42,15 +42,16 @@ def activate_window(hwnd):
         # 창 활성화
         win32gui.SetForegroundWindow(hwnd)
         time.sleep(0.1)  # 활성화 대기
-        return True
+        return True, None
     except Exception as e:
-        print(f"[창 제어] 활성화 실패: {e}")
-        return False
+        error_msg = f"창 활성화 실패: {e}"
+        print(f"[창 제어] {error_msg}")
+        return False, error_msg
 
 
 def send_message_to_window(hwnd, message):
     """
-    특정 창에 메시지 전송
+    특정 창에 메시지 전송. 실패시 (False, error_msg) 반환
     1. 창 활성화
     2. 클립보드에 복사
     3. Ctrl+V 붙여넣기
@@ -59,12 +60,14 @@ def send_message_to_window(hwnd, message):
     try:
         # 창 유효성 확인
         if not is_window_valid(hwnd):
-            print(f"[창 제어] 유효하지 않은 HWND: {hwnd}")
-            return False
+            error_msg = f"유효하지 않은 HWND: {hwnd}"
+            print(f"[창 제어] {error_msg}")
+            return False, error_msg
 
         # 창 활성화
-        if not activate_window(hwnd):
-            return False
+        success, error_msg = activate_window(hwnd)
+        if not success:
+            return False, error_msg
 
         # 클립보드에 메시지 복사
         pyperclip.copy(message)
@@ -78,11 +81,12 @@ def send_message_to_window(hwnd, message):
         pyautogui.press('enter')
 
         print(f"[창 제어] 메시지 전송 완료: {message[:50]}...")
-        return True
+        return True, None
 
     except Exception as e:
-        print(f"[창 제어] 메시지 전송 실패: {e}")
-        return False
+        error_msg = f"메시지 전송 실패: {e}"
+        print(f"[창 제어] {error_msg}")
+        return False, error_msg
 
 
 def find_windows_by_title(keyword):

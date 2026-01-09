@@ -110,3 +110,77 @@ claude
 - PC 서버와 핸드폰이 같은 네트워크에 있어야 함
 - Claude 창이 활성화되어 있어야 명령 전송 가능
 - 이 프로젝트 폴더에서 실행해야 Hook이 적용됨
+
+## 통신 구조
+
+```
+┌─────────────┐     WebSocket      ┌─────────────┐
+│   Flutter   │◄──────────────────►│  PC Server  │
+│     App     │     Port 8766      │  server.py  │
+└─────────────┘                    └──────┬──────┘
+                                          │
+                                          │ HTTP POST
+                                          │ Port 8765
+                                          │
+                                   ┌──────┴──────┐
+                                   │ Claude Code │
+                                   │   Hooks     │
+                                   └─────────────┘
+```
+
+### 포트 정보
+| 포트 | 프로토콜 | 용도 |
+|------|----------|------|
+| 8765 | HTTP | Hook → Server (권한 요청, 작업 결과) |
+| 8766 | WebSocket | App ↔ Server (실시간 양방향 통신) |
+
+### HTTP 엔드포인트
+| 경로 | 설명 |
+|------|------|
+| `POST /` | 권한 요청 수신 |
+| `POST /tool-result` | 작업 결과 수신 |
+| `POST /response` | 앱 HTTP 응답 (백그라운드) |
+
+### WebSocket 메시지 타입
+| 타입 | 방향 | 설명 |
+|------|------|------|
+| `command` | App→Server | 명령 전송 요청 |
+| `command_result` | Server→App | 명령 전송 결과 (에러 메시지 포함) |
+| `permission_request` | Server→App | 권한 요청 알림 |
+| `permission_response` | App→Server | 권한 응답 |
+| `tool_result` | Server→App | 작업 결과 알림 |
+| `hwnd_update` | Server→App | 현재 연결된 창 정보 |
+| `window_select` | Server→App | 창 선택 요청 (여러 개일 때) |
+| `select_window` | App→Server | 창 선택 응답 |
+| `refresh_windows` | App→Server | 창 목록 새로고침 요청 |
+| `open_cmd` | App→Server | 새 CMD 창 열기 요청 |
+
+## 개발 기록
+
+### v1.0 - 초기 버전
+- 기본 기능 구현 완료
+  - PC 서버 (WebSocket + HTTP)
+  - Flutter 앱 (리모컨 UI)
+  - Claude Code Hooks (권한 요청, 작업 결과)
+  - Windows 창 제어 (HWND 기반)
+
+### v1.1 - 에러 메시지 기능 추가
+- **window_controller.py**: 함수 반환값 변경
+  - `activate_window()`: `bool` → `(bool, error_msg)`
+  - `send_message_to_window()`: `bool` → `(bool, error_msg)`
+- **server.py**: 에러 메시지를 앱으로 전송
+- **main.dart**: 에러 메시지 상태바 표시 (빨간색)
+
+### 시도했으나 제외된 기능
+- **Notification Hook**: Claude 응답을 앱에 전송하려 했으나, Notification Hook은 시스템 메시지만 제공하고 Claude의 실제 텍스트 응답은 포함하지 않아서 제외됨
+
+## Git 정보
+
+```bash
+# 저장소 위치
+c:/Users/akqls/Downloads/popup claude/claude-remote-v2/
+
+# 초기 커밋
+git log --oneline
+e01dceb Initial commit: Claude Remote Control v1.0
+```

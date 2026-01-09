@@ -162,14 +162,17 @@ async def handle_app_connection(websocket):
                 if hwnd and msg:
                     # 비동기로 창 제어 실행 (블로킹 방지)
                     loop = asyncio.get_event_loop()
-                    success = await loop.run_in_executor(
+                    success, error_msg = await loop.run_in_executor(
                         None, send_message_to_window, hwnd, msg
                     )
-                    await websocket.send(json.dumps({
+                    result = {
                         "type": "command_result",
                         "success": success,
                         "message": msg[:50]
-                    }))
+                    }
+                    if error_msg:
+                        result["error"] = error_msg
+                    await websocket.send(json.dumps(result))
                 else:
                     await websocket.send(json.dumps({
                         "type": "command_result",

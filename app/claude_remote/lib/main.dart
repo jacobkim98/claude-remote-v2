@@ -319,7 +319,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
           } else if (type == 'command_result') {
             final success = data['success'] ?? false;
-            _showStatusMessage(success ? 'Command sent!' : 'Failed to send', success);
+            final error = data['error'];
+            _showStatusMessage(
+              success ? 'Command sent!' : (error ?? 'Failed to send'),
+              success
+            );
 
           } else if (type == 'cmd_result') {
             final success = data['success'] ?? false;
