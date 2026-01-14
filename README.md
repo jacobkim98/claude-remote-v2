@@ -192,3 +192,17 @@ claude
 ### 시도했으나 제외된 기능
 - **Notification Hook**: Claude 응답을 앱에 전송하려 했으나, Notification Hook은 시스템 메시지만 제공하고 Claude의 실제 텍스트 응답은 포함하지 않아서 제외됨
 - **Stop Hook의 transcript_path**: 최종적으로 Stop Hook + transcript_path를 사용하여 Claude 응답 추출 성공
+
+## 앞으로 개발할 목록
+
+### 1. AskUserQuestion 알림 지원 (대기 중)
+- **현재 상태**: Claude Code에서 `AskUserQuestion` Hook을 지원하지 않음
+- **문제점**: Claude가 "1번 방식, 2번 방식 중 선택해주세요" 같은 질문을 할 때 앱으로 알림이 오지 않음
+- **관련 GitHub Issues**:
+  - [#15872](https://github.com/anthropics/claude-code/issues/15872) - AskUserQuestion Hook 지원 요청
+  - [#12605](https://github.com/anthropics/claude-code/issues/12605) - AskUserQuestion Hook 지원 요청
+  - [#13830](https://github.com/anthropics/claude-code/issues/13830) - 알림 Hook에 AskUserQuestion 추가 요청
+- **구현 예정**: Anthropic에서 Hook 지원 시 구현
+  - 앱으로 질문 내용 + 선택지 전송
+  - 앱에서 선택지 버튼으로 응답
+  - 선택한 답변을 Claude에게 자동 입력
