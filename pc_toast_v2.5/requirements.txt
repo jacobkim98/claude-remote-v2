@@ -1,0 +1,4 @@
+aiohttp>=3.9.0
+windows-toasts>=1.0.0
+pyautogui>=0.9.54
+pygetwindow>=0.0.9
